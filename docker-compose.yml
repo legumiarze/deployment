@@ -1,0 +1,57 @@
+version: '3.9'
+
+services:
+  react-app:
+    build:
+      context: ./frontend
+      dockerfile: "Dockerfile"
+    ports:
+      - "80:4000"
+    networks: [ "default" ]
+  nestjs:
+    build:
+      context: ./backend
+      dockerfile: "node.Dockerfile"
+      target: "development"
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    environment:
+      DATABASE_URL: "neo4j://neo4j:7687"
+      DATABASE_USERNAME: "neo4j"
+      DATABASE_PASSWORD: "password"
+    ports:
+      - "${FORWARD_NEST_PORT:-3000}:3000"
+    depends_on: [ "neo4j" ]
+    volumes: [ "./:/app:delegated" ]
+    networks: [ "default" ]
+
+  neo4j:
+    build:
+      context: './backend'
+      dockerfile: 'neo4j.Dockerfile'
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    restart: 'unless-stopped'
+    ports:
+      - "${FORWARD_NEO_PORT_1:-7474}:7474"
+      - "${FORWARD_NEO_PORT_2:-7687}:7687"
+    environment:
+      NEO4J_AUTH: 'neo4j/password'
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: 'yes'
+      NEO4J_PLUGINS: '["apoc", "apoc-extended", "graph-data-science"]'
+      NEO4J_db_logs_query_enabled: 'VERBOSE'
+    volumes:
+      - 'neo4j-data:/data'
+      - './data:/var/lib/neo4j/import'
+    networks:
+      - 'default'
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  neo4j-data:
+    driver: local
